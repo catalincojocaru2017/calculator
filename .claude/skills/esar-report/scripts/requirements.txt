@@ -1,0 +1,8 @@
+opencv-python-headless>=4.8
+numpy
+pillow>=9.4
+# optional, for HEIC photos straight from an iPhone:
+# pillow-heif
+# tests only:
+# pytest
+# scikit-image
