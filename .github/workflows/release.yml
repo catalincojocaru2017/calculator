@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag like v0.1.0 -> CI gate -> build -> demo audio -> GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml   # reuse the whole CI pipeline as a gate
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # only this job may create releases
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tag must match the version in pyproject.toml
+        run: |
+          VERSION=$(python -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME != pyproject version v$VERSION"; exit 1
+          fi
+      - run: pip install build
+      - run: python -m build
+      - name: Render demo audio for every profile
+        run: |
+          pip install dist/*.whl
+          mkdir demos
+          for p in ferrari_v8 lambo_v10 bmw_i6 muscle_v8; do
+            exhaust-sound --source sim --profile "$p" --wav "demos/$p.wav"
+          done
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* demos/*.wav --generate-notes --title "$GITHUB_REF_NAME"

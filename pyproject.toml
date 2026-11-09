@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exhaust-sound"
+version = "0.1.0"
+description = "Fake exhaust sound: read RPM from an ELM327 OBD2 adapter and play a synthesized engine sound."
+readme = "exhaust_sound/README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+# Needed only on the machine that talks to the car / plays audio.
+hardware = ["sounddevice>=0.4.6", "pyserial>=3.5"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "build>=1.2", "twine>=5"]
+
+[project.scripts]
+exhaust-sound = "exhaust_sound.main:main"
+
+[tool.setuptools.packages.find]
+include = ["exhaust_sound*"]
+exclude = ["exhaust_sound.tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["exhaust_sound/tests"]
+
+[tool.coverage.run]
+source = ["exhaust_sound"]
+omit = ["exhaust_sound/main.py", "exhaust_sound/tests/*"]  # needs real audio hardware; covered by the CLI smoke test in CI
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

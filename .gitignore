@@ -4,3 +4,8 @@ out/
 __pycache__/
 *.pyc
 *.wav
+dist/
+build/
+*.egg-info/
+.coverage
+coverage.xml

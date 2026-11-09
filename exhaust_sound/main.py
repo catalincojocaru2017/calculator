@@ -5,6 +5,7 @@ Examples:
   python -m exhaust_sound.main --source serial --port /dev/rfcomm0 --device "soundbar"
   python -m exhaust_sound.main --source sim --wav demo.wav --duration 16   # no audio device needed
 """
+
 from __future__ import annotations
 
 import argparse
@@ -54,7 +55,9 @@ def obd_loop(source, synth: EngineSynth, stop: threading.Event) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--source", choices=["sim", "serial", "tcp"], default="sim")
-    ap.add_argument("--port", default="/dev/rfcomm0", help="serial port for Bluetooth Classic ELM327")
+    ap.add_argument(
+        "--port", default="/dev/rfcomm0", help="serial port for Bluetooth Classic ELM327"
+    )
     ap.add_argument("--host", default="192.168.0.10")
     ap.add_argument("--tcp-port", type=int, default=35000)
     ap.add_argument("--profile", choices=sorted(PROFILES), default="ferrari_v8")
@@ -69,6 +72,7 @@ def main() -> None:
 
     if args.list_devices:
         import sounddevice as sd
+
         print(sd.query_devices())
         return
 
@@ -81,8 +85,11 @@ def main() -> None:
     if args.source == "sim":
         source = SimulatedSource()
     else:
-        transport = (SerialTransport(args.port) if args.source == "serial"
-                     else TcpTransport(args.host, args.tcp_port))
+        transport = (
+            SerialTransport(args.port)
+            if args.source == "serial"
+            else TcpTransport(args.host, args.tcp_port)
+        )
         source = Elm327(transport)
         print("Connecting to ELM327 (ignition ON)...")
         source.connect()
@@ -97,9 +104,15 @@ def main() -> None:
     threading.Thread(target=obd_loop, args=(source, synth, stop), daemon=True).start()
     device = int(args.device) if args.device and args.device.isdigit() else args.device
     try:
-        with sd.OutputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK, channels=1,
-                             dtype="float32", device=device, callback=callback,
-                             latency="low"):
+        with sd.OutputStream(
+            samplerate=SAMPLE_RATE,
+            blocksize=BLOCK,
+            channels=1,
+            dtype="float32",
+            device=device,
+            callback=callback,
+            latency="low",
+        ):
             print(f"Playing '{args.profile}'. Ctrl+C to stop.")
             while True:
                 time.sleep(0.5)

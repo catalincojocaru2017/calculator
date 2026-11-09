@@ -5,6 +5,7 @@ firing frequency plus filtered noise, saturated for aggression.
 
 Firing frequency of a 4-stroke engine:  f0 = rpm / 60 * cylinders / 2
 """
+
 from __future__ import annotations
 
 import math
@@ -22,13 +23,13 @@ N_HARMONICS = 16
 class Profile:
     name: str
     cylinders: int
-    virtual_idle: float      # RPM the "fake" engine idles at
-    virtual_redline: float   # RPM the "fake" engine reaches at the real redline
-    slope: float             # harmonic roll-off; higher = darker/smoother
-    half_order: float        # 0.5-order content: uneven-firing "burble" (cross-plane V8)
-    drive: float             # saturation amount; higher = more aggressive
-    noise: float             # intake/exhaust rasp level
-    crackle: float           # 0..1 pops on deceleration
+    virtual_idle: float  # RPM the "fake" engine idles at
+    virtual_redline: float  # RPM the "fake" engine reaches at the real redline
+    slope: float  # harmonic roll-off; higher = darker/smoother
+    half_order: float  # 0.5-order content: uneven-firing "burble" (cross-plane V8)
+    drive: float  # saturation amount; higher = more aggressive
+    noise: float  # intake/exhaust rasp level
+    crackle: float  # 0..1 pops on deceleration
 
 
 PROFILES = {
@@ -70,12 +71,13 @@ class EngineSynth:
         self._gain = 0.0
         self._w = np.zeros(N_HARMONICS)
         self._k = np.arange(1, N_HARMONICS + 1, dtype=np.float64)
-        self._norm = 1.0 / float(np.sum(self._k ** -profile.slope))
+        self._norm = 1.0 / float(np.sum(self._k**-profile.slope))
         self._noise_tail = np.zeros(7)
 
     # ------------------------------------------------------------------ input
-    def set_input(self, rpm: float, throttle: float | None = None,
-                  now: float | None = None) -> None:
+    def set_input(
+        self, rpm: float, throttle: float | None = None, now: float | None = None
+    ) -> None:
         """Feed a new OBD reading. throttle is 0..100 (%) or None if unsupported."""
         now = time.monotonic() if now is None else now
         with self._lock:
@@ -127,11 +129,10 @@ class EngineSynth:
         self._phase = float(phase[-1] % (2.0 * TWO_PI))
 
         # per-block harmonic weights (brighter with load/rpm), crossfaded across block
-        tn = min(1.0, max(0.0, (new_rpm - self.real_idle) /
-                          (self.real_redline - self.real_idle)))
+        tn = min(1.0, max(0.0, (new_rpm - self.real_idle) / (self.real_redline - self.real_idle)))
         f_mean = float(f0.mean())
         fc = 600.0 + 5000.0 * load * (0.4 + 0.6 * tn)
-        w_new = self._k ** -p.slope / (1.0 + (self._k * f_mean / fc) ** 2)
+        w_new = self._k**-p.slope / (1.0 + (self._k * f_mean / fc) ** 2)
         w_new = np.where(self._k * f_mean < 0.45 * sr, w_new, 0.0) * self._norm
         ramp = np.linspace(0.0, 1.0, n, endpoint=False)
         w_ramp = self._w[:, None] + (w_new - self._w)[:, None] * ramp[None, :]
@@ -148,13 +149,17 @@ class EngineSynth:
         sig = harm * 0.8 + noise * p.noise * (0.2 + 0.8 * load)
 
         # deceleration crackle: falling RPM, foot off
-        if (p.crackle > 0 and load < 0.3 and rate < -800.0
-                and float(v_rpm.mean()) > p.virtual_idle * 1.5
-                and self._rng.random() < p.crackle * n / sr * 25.0):
+        if (
+            p.crackle > 0
+            and load < 0.3
+            and rate < -800.0
+            and float(v_rpm.mean()) > p.virtual_idle * 1.5
+            and self._rng.random() < p.crackle * n / sr * 25.0
+        ):
             length = min(n, 500)
             pos = int(self._rng.integers(0, max(1, n - length + 1)))
             env = np.exp(-np.arange(length) / 90.0)
-            sig[pos:pos + length] += self._rng.standard_normal(length) * env * 2.0
+            sig[pos : pos + length] += self._rng.standard_normal(length) * env * 2.0
 
         # master: saturation + gain (silent when engine is off)
         gain_t = 0.0 if new_rpm < 100.0 else 0.35 + 0.65 * load

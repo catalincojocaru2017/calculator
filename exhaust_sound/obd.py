@@ -4,14 +4,15 @@ Only Mode 01 (live data) PIDs are ever sent. Nothing is written to the ECU.
   PID 010C  RPM       = (A*256 + B) / 4
   PID 0111  Throttle  = A * 100 / 255   (%)  -- not supported on every car
 """
+
 from __future__ import annotations
 
 import re
 import socket
 import time
-from typing import Optional, Protocol, Tuple
+from typing import Protocol
 
-Reading = Tuple[float, Optional[float]]  # (rpm, throttle %)
+Reading = tuple[float, float | None]  # (rpm, throttle %)
 
 _RPM_RE = re.compile(r"410C([0-9A-F]{4})")
 _THR_RE = re.compile(r"4111([0-9A-F]{2})")
@@ -21,12 +22,12 @@ def clean(resp: str) -> str:
     return re.sub(r"\s+", "", resp.upper().replace(">", ""))
 
 
-def parse_rpm(resp: str) -> Optional[float]:
+def parse_rpm(resp: str) -> float | None:
     m = _RPM_RE.search(clean(resp))
     return int(m.group(1), 16) / 4.0 if m else None
 
 
-def parse_throttle(resp: str) -> Optional[float]:
+def parse_throttle(resp: str) -> float | None:
     m = _THR_RE.search(clean(resp))
     return int(m.group(1), 16) * 100.0 / 255.0 if m else None
 
@@ -42,6 +43,7 @@ class SerialTransport:
 
     def __init__(self, port: str, baud: int = 38400) -> None:
         import serial  # lazy: only needed for real hardware
+
         self._s = serial.Serial(port, baud, timeout=0.05)
 
     def write(self, data: bytes) -> None:
@@ -67,7 +69,7 @@ class TcpTransport:
     def read(self) -> bytes:
         try:
             return self._s.recv(1024)
-        except socket.timeout:
+        except TimeoutError:
             return b""
 
     def close(self) -> None:
@@ -79,7 +81,7 @@ class Elm327:
 
     def __init__(self, transport: Transport) -> None:
         self.t = transport
-        self._suffix = "1"        # "010C1": stop after the first reply -> faster
+        self._suffix = "1"  # "010C1": stop after the first reply -> faster
         self._has_throttle = False
         self._cycle = 0
 
@@ -122,12 +124,12 @@ class SimulatedSource:
 
     # (duration s, rpm_from, rpm_to, throttle %)
     CYCLE = [
-        (3.0, 800, 800, 0),         # idle
-        (4.0, 800, 6000, 80),       # pull to redline
-        (1.0, 6000, 6000, 100),     # hold
-        (1.5, 6000, 2500, 0),       # lift off -> crackle
-        (2.0, 2500, 4500, 60),      # part-throttle
-        (2.0, 4500, 800, 0),        # coast down
+        (3.0, 800, 800, 0),  # idle
+        (4.0, 800, 6000, 80),  # pull to redline
+        (1.0, 6000, 6000, 100),  # hold
+        (1.5, 6000, 2500, 0),  # lift off -> crackle
+        (2.0, 2500, 4500, 60),  # part-throttle
+        (2.0, 4500, 800, 0),  # coast down
     ]
     LENGTH = sum(c[0] for c in CYCLE)
 
