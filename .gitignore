@@ -1,3 +1,6 @@
 .npm
 node_modules/
 out/
+__pycache__/
+*.pyc
+*.wav
